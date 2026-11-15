@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+results/
+task.local.json
+task.*.local.json
+work/
+.DS_Store

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Day Planner</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap">
+<style>
+:root{--bg:#eef1ec;--panel:#fbfcfa;--ink:#16243a;--mute:#5d6b7c;--line:#d3dad2;--p3:#2f7d62;--p2:#c98a1b;--p1:#7a8aa0;--fix:#16243a;--acc:#2a5bd7;--accfg:#fff;--b3:#dcefe6;--b2:#f6e9cc;--b1:#e4e9f0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1722;--panel:#17212f;--ink:#e6ecf4;--mute:#97a5b8;--line:#2a374a;--p3:#5fc29e;--p2:#e3ad4a;--p1:#8fa0b8;--fix:#e6ecf4;--acc:#6f95ff;--accfg:#0f1722;--b3:#1d3a31;--b2:#3b2f15;--b1:#222e3f;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1722;--panel:#17212f;--ink:#e6ecf4;--mute:#97a5b8;--line:#2a374a;--p3:#5fc29e;--p2:#e3ad4a;--p1:#8fa0b8;--fix:#e6ecf4;--acc:#6f95ff;--accfg:#0f1722;--b3:#1d3a31;--b2:#3b2f15;--b1:#222e3f;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:clamp(28px,5vw,44px);font-weight:800;letter-spacing:-.02em;margin:8px 0 4px}
+.sub{color:var(--mute);margin:0 0 20px}
+.grid{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.panel h2{font-size:17px;margin:0 0 12px}
+label{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
+input,select,button{font:inherit;color:inherit}
+input,select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.row{display:flex;gap:10px}.row>*{flex:1;min-width:0}
+.btn{background:var(--acc);color:var(--accfg);border:0;border-radius:8px;padding:10px 14px;font-weight:600;cursor:pointer;width:100%;margin-top:14px}
+.ghost{background:none;border:1px solid var(--line);color:var(--mute);border-radius:8px;padding:4px 9px;cursor:pointer;font-size:13px}
+.hint{font-size:12.5px;color:var(--mute);margin-top:6px}
+.tl{position:relative;border-left:2px solid var(--line);margin-left:52px}
+.hr{position:absolute;left:-52px;width:44px;text-align:right;font-size:12px;color:var(--mute);transform:translateY(-8px)}
+.hl{position:absolute;left:0;right:0;border-top:1px dashed var(--line)}
+.blk{position:absolute;left:10px;right:4px;border-radius:9px;padding:5px 10px;overflow:hidden;border-left:5px solid var(--p1);background:var(--b1);display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
+.blk.p3{border-color:var(--p3);background:var(--b3)}.blk.p2{border-color:var(--p2);background:var(--b2)}
+.blk.fx{border-color:var(--fix)}
+.blk b{font-weight:600;font-size:14.5px;display:block;line-height:1.25}
+.blk small{color:var(--mute);font-size:12px}
+.acts{display:flex;gap:4px;flex-shrink:0}
+.acts button{background:var(--panel);border:1px solid var(--line);border-radius:6px;cursor:pointer;width:26px;height:26px;line-height:1;padding:0}
+.now{position:absolute;left:-6px;right:0;border-top:2px solid #d9433b;z-index:2}
+.now::before{content:"";position:absolute;left:0;top:-5px;width:8px;height:8px;border-radius:50%;background:#d9433b}
+.list{list-style:none;margin:10px 0 0;padding:0}
+.list li{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:14px}
+.warn{background:var(--b2);border-radius:8px;padding:8px 10px;font-size:13.5px;margin-top:12px}
+.empty{color:var(--mute);padding:24px 8px}
+.bar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Day Planner</h1>
+  <p class="sub">Add what you need to do. The planner fits it into your day, most important first.</p>
+  <div class="grid">
+    <div>
+      <div class="panel">
+        <h2>Add a task</h2>
+        <label for="t">Task</label><input id="t" placeholder="Study for calculus quiz" maxlength="80">
+        <div class="row">
+          <div><label for="d">Minutes</label><input id="d" type="number" min="5" step="5" value="45"></div>
+          <div><label for="p">Priority</label><select id="p"><option value="3">High</option><option value="2" selected>Medium</option><option value="1">Low</option></select></div>
+        </div>
+        <label for="f">Fixed start time (optional)</label><input id="f" type="time">
+        <button class="btn" id="add">Add task</button>
+        <div class="hint">Leave the start time empty and the planner picks the slot.</div>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <h2>Your day</h2>
+        <div class="row">
+          <div><label for="s">Starts</label><input id="s" type="time" value="08:00"></div>
+          <div><label for="e">Ends</label><input id="e" type="time" value="20:00"></div>
+        </div>
+        <label for="g">Break between tasks (minutes)</label><input id="g" type="number" min="0" step="5" value="5">
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="bar"><h2 style="margin:0" id="sum">Today</h2><button class="ghost" id="clr">Clear all</button></div>
+        <div id="tl"></div>
+        <div id="un"></div>
+        <ul class="list" id="done"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+var K="dayplanner.v1",PX=1.1,tasks=[],cfg={s:"08:00",e:"20:00",g:5};
+function $(i){return document.getElementById(i)}
+function load(){try{var r=localStorage.getItem(K);if(r){var o=JSON.parse(r);tasks=o.tasks||[];cfg=o.cfg||cfg}}catch(x){}}
+function save(){try{localStorage.setItem(K,JSON.stringify({tasks:tasks,cfg:cfg}))}catch(x){}}
+function tm(v){var a=v.split(":");return +a[0]*60+ +a[1]}
+function fm(m){var h=Math.floor(m/60),n=m%60;return (h<10?"0":"")+h+":"+(n<10?"0":"")+n}
+function plan(){
+  var S=tm(cfg.s),E=tm(cfg.e),g=+cfg.g||0,out=[],un=[];
+  var act=tasks.filter(function(t){return !t.done});
+  var fixed=act.filter(function(t){return t.at!=null}).sort(function(a,b){return a.at-b.at});
+  var gaps=[[S,E]];
+  fixed.forEach(function(t){
+    var a=t.at,b=t.at+t.dur;out.push({t:t,start:a,end:b});
+    var ng=[];gaps.forEach(function(x){
+      if(b<=x[0]||a>=x[1]){ng.push(x);return}
+      if(a>x[0])ng.push([x[0],a]);if(b<x[1])ng.push([b,x[1]]);
+    });gaps=ng;
+  });
+  var flex=act.filter(function(t){return t.at==null}).sort(function(a,b){return b.pr-a.pr||a.dur-b.dur});
+  flex.forEach(function(t){
+    for(var i=0;i<gaps.length;i++){
+      var x=gaps[i];
+      if(x[1]-x[0]>=t.dur){
+        out.push({t:t,start:x[0],end:x[0]+t.dur});
+        x[0]=Math.min(x[1],x[0]+t.dur+g);return;
+      }
+    }
+    un.push(t);
+  });
+  out.sort(function(a,b){return a.start-b.start});
+  return {out:out,un:un,S:S,E:E};
+}
+function el(tag,cls,txt){var n=document.createElement(tag);if(cls)n.className=cls;if(txt!=null)n.textContent=txt;return n}
+function render(){
+  var P=plan(),tl=$("tl");tl.textContent="";
+  var act=tasks.filter(function(t){return !t.done}).length;
+  $("sum").textContent=act?(act+" open · "+P.out.length+" scheduled"):"Today";
+  if(P.E<=P.S){tl.appendChild(el("div","empty","The day must end after it starts."));return}
+  if(!tasks.length)tl.appendChild(el("div","empty","No tasks yet. Add your first one on the left."));
+  var h=(P.E-P.S)*PX,box=el("div","tl");box.style.height=h+"px";
+  for(var m=Math.ceil(P.S/60)*60;m<=P.E;m+=60){
+    var y=(m-P.S)*PX,l=el("div","hl");l.style.top=y+"px";box.appendChild(l);
+    var r=el("div","hr",fm(m));r.style.top=y+"px";box.appendChild(r);
+  }
+  P.out.forEach(function(o){
+    var b=el("div","blk p"+o.t.pr+(o.t.at!=null?" fx":""));
+    b.style.top=(o.start-P.S)*PX+"px";b.style.height=Math.max(28,(o.end-o.start)*PX-2)+"px";
+    var d=el("div");d.appendChild(el("b",null,o.t.title));
+    d.appendChild(el("small",null,fm(o.start)+"–"+fm(o.end)+(o.t.at!=null?" · fixed":"")));
+    b.appendChild(d);
+    var a=el("div","acts"),ok=el("button",null,"✓"),x=el("button",null,"×");
+    ok.title="Mark done";ok.setAttribute("aria-label","Mark done");x.title="Delete";x.setAttribute("aria-label","Delete");
+    ok.onclick=function(){o.t.done=true;save();render()};
+    x.onclick=function(){tasks=tasks.filter(function(q){return q!==o.t});save();render()};
+    a.appendChild(ok);a.appendChild(x);b.appendChild(a);box.appendChild(b);
+  });
+  var n=new Date(),nm=n.getHours()*60+n.getMinutes();
+  if(nm>=P.S&&nm<=P.E){var nl=el("div","now");nl.style.top=(nm-P.S)*PX+"px";box.appendChild(nl)}
+  tl.appendChild(box);
+  var un=$("un");un.textContent="";
+  if(P.un.length){
+    var w=el("div","warn","Not enough time today for: "+P.un.map(function(t){return t.title+" ("+t.dur+" min)"}).join(", ")+". Shorten a task, widen your day, or delete something.");
+    un.appendChild(w);
+  }
+  var dn=$("done");dn.textContent="";
+  tasks.filter(function(t){return t.done}).forEach(function(t){
+    var li=el("li"),s=el("span",null,"Done: "+t.title),u=el("button","ghost","Undo");
+    u.onclick=function(){t.done=false;save();render()};li.appendChild(s);li.appendChild(u);dn.appendChild(li);
+  });
+}
+$("add").onclick=function(){
+  var title=$("t").value.trim(),dur=parseInt($("d").value,10);
+  if(!title){$("t").focus();return}
+  if(!(dur>=5))dur=30;
+  var f=$("f").value;
+  tasks.push({id:Date.now()+Math.random(),title:title,dur:dur,pr:+$("p").value,at:f?tm(f):null,done:false});
+  $("t").value="";$("f").value="";save();render();$("t").focus();
+};
+$("t").addEventListener("keydown",function(e){if(e.key==="Enter")$("add").click()});
+$("clr").onclick=function(){if(tasks.length&&confirm("Delete all tasks?")){tasks=[];save();render()}};
+["s","e","g"].forEach(function(id){$(id).addEventListener("change",function(){cfg={s:$("s").value||"08:00",e:$("e").value||"20:00",g:$("g").value||0};save();render()})});
+load();$("s").value=cfg.s;$("e").value=cfg.e;$("g").value=cfg.g;
+render();setInterval(render,60000);
+})();
+</script>
+</body>
+</html>

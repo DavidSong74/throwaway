@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/OWNER/REPOSITORY.git",
+  "base_sha": "REPLACE_WITH_FULL_40_CHARACTER_COMMIT_SHA",
+  "target_file": "calculator.py",
+  "request": "Implement multiply(a, b), preserving add and subtract. Support negative, zero, and floating-point arguments. Do not change the tests.",
+  "test_command": "python3 -m unittest discover -v",
+  "candidates": 2,
+  "max_repairs": 1,
+  "max_output_tokens": 2400,
+  "command_timeout": 90
+}
