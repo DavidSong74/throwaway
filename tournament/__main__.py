@@ -8,15 +8,17 @@ import sys
 from .providers import Nosana
 from .runner import run
 from .spec import Task
+from .config import load_local_env
 
 
 def main():
     parser = argparse.ArgumentParser(description="Compare independent coding candidates")
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("demo", help="Offline, deterministic fixtures; no cloud or AI calls")
     commands.add_parser("models", help="Read currently served Nosana models; requires API key")
     prepare_parser = commands.add_parser("prepare-day-planner", help="Snapshot local HTML and write a run configuration; no network")
     prepare_parser.add_argument("--file", type=Path, default=Path("examples/day_planner/Day Planner.html"))
+    report_parser = commands.add_parser("report", help="Build a local review page from captured run artifacts")
+    report_parser.add_argument("directory", type=Path)
     for name in ("plan", "run"):
         sub = commands.add_parser(name)
         sub.add_argument("task", type=Path)
@@ -25,17 +27,18 @@ def main():
             sub.add_argument("--models", help="Comma-separated available IDs, one per candidate")
     args = parser.parse_args()
     try:
-        if args.command == "prepare-day-planner":
+        load_local_env()
+        if args.command == "report":
+            from .report import build_report
+            print(f"Review: {build_report(args.directory).resolve()}")
+            return 0
+        elif args.command == "prepare-day-planner":
             from .prepare import prepare
             config, task = prepare(args.file)
             print(f"Prepared: {config}")
             print(f"Exact baseline: {task.base_sha}")
             print("Next: python3 -m tournament plan task.day-planner.local.json")
             return 0
-        elif args.command == "demo":
-            from .demo import demo
-            directory, results = demo()
-            print("OFFLINE FIXTURES: deterministic code, not AI-generated candidates")
         elif args.command == "models":
             # Deliberately display only catalog fields, never credentials or headers.
             for model in Nosana().models():
@@ -69,6 +72,8 @@ def main():
                 raise ValueError("Requested model is unavailable; run models to inspect the live catalog")
             directory, results = run(task, models)
         print(f"Artifacts: {directory.resolve()}")
+        from .report import build_report
+        print(f"Review: {build_report(directory).resolve()}")
         for result in results:
             print(f"{result['candidate']}: {result['status']} | cleanup={result['cleanup']}")
         return 0 if all(r["status"] == "passed" and r["cleanup"] == "confirmed" for r in results) else 1

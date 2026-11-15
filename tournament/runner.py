@@ -17,6 +17,7 @@ from .html_source import validate_html
 
 
 def save_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix(".tmp")
     temp.write_text(json.dumps(value, indent=2) + "\n")
     temp.replace(path)
@@ -39,16 +40,22 @@ def source_from_reply(reply, suffix=".py"):
     return source
 
 
-def candidate(task, model, directory, workspace_factory=DaytonaWorkspace, model_factory=Nosana, bundle=None):
+def candidate(task, model, directory, workspace_factory=DaytonaWorkspace, model_factory=Nosana, bundle=None, retain_previews=False):
     directory.mkdir(parents=True)
     record = {"candidate": directory.name, "model": model, "base_sha": task.base_sha,
-              "status": "infrastructure_error", "sandbox_id": None,
+              "status": "running", "stage": "queued", "sandbox_id": None,
               "verification": "not_run", "cleanup": "not_run", "usage": [],
               "target_file": task.target_file, "browser_checks": "not_run"}
     workspace = None
+    retained = False
 
     def persist():
         save_json(directory / "result.json", record)
+
+    def stage(name):
+        record["stage"] = name
+        persist()
+        print(f"[{directory.name}] {name}", flush=True)
 
     def execute(command):
         return workspace.exec(command, timeout=task.command_timeout)
@@ -79,9 +86,12 @@ def candidate(task, model, directory, workspace_factory=DaytonaWorkspace, model_
 
     persist()
     try:
+        stage("provisioning")
         workspace = workspace_factory("tournament-" + uuid4().hex[:12])
         record["sandbox_id"] = workspace.create()
+        record["execution_api"] = getattr(workspace, "api_version", "fixture")
         persist()  # Persist ID before clone, inference, or verification.
+        stage("preparing_source")
         if bundle is not None:
             upload("/tmp/tournament-input.bundle", bundle.read_bytes())
             required("git clone -- /tmp/tournament-input.bundle /tmp/candidate-repo")
@@ -114,12 +124,14 @@ def candidate(task, model, directory, workspace_factory=DaytonaWorkspace, model_
         manifest_command = prefix + "python3 -c " + shlex.quote(manifest_script)
         baseline_manifest = required(manifest_command)
         if task.verification == "day_planner":
+            stage("installing_browser")
             required("mkdir -p /tmp/tournament-checks /tmp/tournament-artifacts")
             verifier = Path(__file__).parent / "verification" / "day_planner.py"
             upload("/tmp/tournament-checks/day_planner.py", verifier.read_bytes())
             required("python3 -m pip install --disable-pip-version-check playwright==1.65.2")
             required("PLAYWRIGHT_BROWSERS_PATH=/tmp/tournament-browsers python3 -m playwright install --with-deps chromium")
             # Record real baseline checks separately. Requested new filters need not exist yet.
+            stage("checking_baseline")
             check = ("PLAYWRIGHT_BROWSERS_PATH=/tmp/tournament-browsers python3 "
                      "/tmp/tournament-checks/day_planner.py --file " + target +
                      " --output /tmp/tournament-artifacts")
@@ -141,6 +153,7 @@ def candidate(task, model, directory, workspace_factory=DaytonaWorkspace, model_
             {"role": "user", "content": json.dumps({"request": task.request,
                 "target_file": task.target_file, "source": original})}]
         for attempt in range(task.max_repairs + 1):
+            stage(f"generating_attempt_{attempt + 1}")
             reply, usage = engine.complete(model, messages, task.max_output_tokens)
             record["usage"].append(usage)
             messages.append({"role": "assistant", "content": reply})
@@ -159,6 +172,7 @@ def candidate(task, model, directory, workspace_factory=DaytonaWorkspace, model_
             (directory / artifact_name).write_text(source, encoding="utf-8")
             record["source_artifact"] = artifact_name
             record["source_sha256"] = hashlib.sha256(source.encode()).hexdigest()
+            stage(f"verifying_attempt_{attempt + 1}")
             code, output = execute(prefix + (check if task.verification == "day_planner" else task.test_command))
             (directory / f"attempt-{attempt + 1}.log").write_text(output)
             record["verification"] = "passed" if code == 0 else "failed"
@@ -191,31 +205,65 @@ def candidate(task, model, directory, workspace_factory=DaytonaWorkspace, model_
                 break
             messages.append({"role": "user", "content": json.dumps({
                 "verification_output": output[-12000:], "request": "Correct the replacement. Return JSON."})})
-    except subprocess.TimeoutExpired:
+        if retain_previews and record["verification"] in {"passed", "failed"} and (directory / "changes.diff").exists():
+            stage("starting_preview")
+            url, expiry = workspace.start_preview()
+            record.update(preview_url=url, preview_port=8080, preview_expires_at=expiry,
+                          preview="passed", export="passed", status="ready" if record["verification"] == "passed" else "failed", cleanup="pending_review")
+            retained = True
+            # Explicit cleanup API plus an expiry timer. Artifacts already live outside the sandbox.
+            import threading
+            def expire():
+                current = directory / "result.json"
+                if current.exists() and json.loads(current.read_text()).get("cleanup") == "confirmed":
+                    workspace.client.close()
+                    return
+                try:
+                    workspace.close()
+                    record["cleanup"] = "confirmed"
+                    record["preview"] = "expired"
+                except Exception:
+                    record["cleanup"] = "needs_attention"
+                persist()
+            timer = threading.Timer(900, expire)
+            timer.daemon = True
+            timer.start()
+    except (subprocess.TimeoutExpired, TimeoutError):
         record["status"] = "timed_out"
-        record["error"] = "CommandTimeout"
+        record["failed_stage"] = record["stage"]
+        record["error"] = "RequestOrCommandTimeout"
     except Exception as error:
         record["status"] = "infrastructure_error"
+        record["failed_stage"] = record["stage"]
         # No raw exception text: SDK errors can contain authenticated endpoints.
         record["error"] = type(error).__name__
+        if type(error) is ValueError:
+            record["error_message"] = str(error)[:500]
+        record["error_code"] = str(getattr(error, "code", ""))
+        record["http_status"] = getattr(error, "status_code", None)
     finally:
-        if workspace is not None:
+        try:
+            stage("retained_for_review" if retained else "cleaning_up")
+        except OSError:
+            pass
+        if workspace is not None and not retained:
             try:
                 workspace.close()
                 record["cleanup"] = "confirmed"
             except Exception as error:
                 record["cleanup"] = "needs_attention"
                 record["cleanup_error"] = type(error).__name__
+        record["stage"] = "finished"
         persist()
     return record
 
 
-def run(task, models, root=Path("results"), workspace_factory=DaytonaWorkspace, model_factory=Nosana):
+def run(task, models, root=Path("results"), workspace_factory=DaytonaWorkspace, model_factory=Nosana, directory=None, retain_previews=False):
     if len(models) != task.candidates or any(not m.strip() for m in models):
         raise ValueError("Provide exactly one non-empty model ID per candidate")
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ-") + uuid4().hex[:8]
-    directory = root / run_id
-    directory.mkdir(parents=True, exist_ok=False)
+    directory = Path(directory) if directory else root / run_id
+    directory.mkdir(parents=True, exist_ok=True)
     save_json(directory / "task.json", asdict(task))
     bundle = None
     if Path(task.repository).is_absolute():
@@ -230,7 +278,7 @@ def run(task, models, root=Path("results"), workspace_factory=DaytonaWorkspace, 
                            cwd=temp, check=True, capture_output=True, timeout=30)
     with ThreadPoolExecutor(max_workers=task.candidates) as pool:
         futures = [pool.submit(candidate, task, model, directory / f"candidate-{i+1}",
-                               workspace_factory, model_factory, bundle) for i, model in enumerate(models)]
+                               workspace_factory, model_factory, bundle, retain_previews) for i, model in enumerate(models)]
         results = [future.result() for future in futures]
     save_json(directory / "summary.json", results)
     return directory, results

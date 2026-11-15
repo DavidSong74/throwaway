@@ -10,3 +10,5 @@ task.local.json
 task.*.local.json
 work/
 .DS_Store
+ui/node_modules/
+ui/dist/

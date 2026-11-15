@@ -3,7 +3,6 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from tournament.demo import demo
 from tournament.runner import candidate, source_from_reply
 from tournament.spec import Task
 
@@ -28,29 +27,6 @@ class TournamentTests(unittest.TestCase):
             with self.subTest(reply=reply), self.assertRaises((ValueError, SyntaxError)):
                 source_from_reply(reply)
 
-    def test_parallel_demo_verifies_real_code_and_exports_applicable_patch(self):
-        import shutil
-        import subprocess
-        with tempfile.TemporaryDirectory() as temp:
-            directory, results = demo(Path(temp) / "runs")
-            self.assertEqual([r["status"] for r in results], ["passed", "failed"])
-            self.assertTrue(all(r["cleanup"] == "confirmed" for r in results))
-            self.assertEqual(results[0]["base_sha"], results[1]["base_sha"])
-            patch = directory / "candidate-1/changes.diff"
-            self.assertIn("def multiply", patch.read_text())
-            self.assertIn("FAILED", (directory / "candidate-2/attempt-1.log").read_text())
-            self.assertEqual(json.loads((directory / "summary.json").read_text()), results)
-            restored = Path(temp) / "restored"
-            restored.mkdir()
-            sample = Path(__file__).resolve().parent.parent / "examples/calculator"
-            for name in ("calculator.py", "test_calculator.py"):
-                shutil.copyfile(sample / name, restored / name)
-            subprocess.run(["git", "init", "-q"], cwd=restored, check=True)
-            subprocess.run(["git", "apply", "--check", str(patch)], cwd=restored, check=True)
-            subprocess.run(["git", "apply", str(patch)], cwd=restored, check=True)
-            check = subprocess.run(["python3", "-m", "unittest", "discover"], cwd=restored, capture_output=True)
-            self.assertEqual(check.returncode, 0, check.stderr.decode())
-
     def test_records_cleanup_failure_without_losing_artifacts(self):
         class BrokenWorkspace:
             def __init__(self, name): pass
@@ -65,3 +41,16 @@ class TournamentTests(unittest.TestCase):
             self.assertEqual(result["cleanup"], "needs_attention")
             self.assertEqual(result["sandbox_id"], "recover-this-id")
             self.assertTrue((Path(temp) / "candidate-1/result.json").exists())
+
+    def test_timeout_keeps_failure_stage_and_cleans_up(self):
+        class TimeoutWorkspace:
+            def __init__(self, name): pass
+            def create(self): return "fixture-timeout"
+            def exec(self, command, timeout): raise TimeoutError()
+            def close(self): pass
+
+        with tempfile.TemporaryDirectory() as temp:
+            record = candidate(self.task(), "unused", Path(temp) / "candidate-1", TimeoutWorkspace)
+            self.assertEqual(record["status"], "timed_out")
+            self.assertEqual(record["failed_stage"], "preparing_source")
+            self.assertEqual(record["cleanup"], "confirmed")

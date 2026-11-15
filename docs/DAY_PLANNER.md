@@ -6,7 +6,7 @@ No public GitHub repository is required. Your original HTML remains unchanged.
 
 ## Prepare and run
 
-From the project root, in the terminal containing your exported provider keys:
+From the project root, with your provider keys/model in `.env` or exported in the terminal:
 
 ```bash
 python3 -m venv .venv
@@ -22,10 +22,19 @@ uses Daytona resources and Nosana inference. `NOSANA_MODEL_ID` must identify a
 currently available model. Preparing again creates a new baseline and updates
 `task.day-planner.local.json`; old snapshots and runs remain recoverable.
 
+Daytona v2 is an alpha API and may not be enabled for an account. The adapter's
+default `DAYTONA_API_VERSION=auto` falls back to the standard API only for that
+explicit feature-disabled response. Authentication failures do not trigger a
+second create attempt. `.[cloud]` includes both SDK namespaces. The standard path
+uses remote process deadlines and a 15-minute idle stop with immediate deletion
+on stop, in addition to explicit deletion and confirmation at run completion.
+
 For another input file, use `prepare-day-planner --file '/absolute/path/page.html'`.
 The generated task uses two candidates, one optional repair each, and up to 12,000
 output tokens per request. Review the plan before launching. These limits are not
-a provider dollar cap. Each candidate installs Playwright and Chromium inside
+a provider dollar cap. Nosana generation requests have a separate 300-second response
+timeout, configurable with `NOSANA_REQUEST_TIMEOUT` (10–600 seconds). The catalog
+request uses 30 seconds. Each candidate installs Playwright and Chromium inside
 Daytona, so first-run browser setup can take several minutes and incur sandbox time.
 The image must permit installing Chromium's Linux dependencies and accessing package servers.
 
@@ -66,6 +75,17 @@ The run also preserves `baseline.bundle`, `task.json`, and `summary.json`.
 Screenshots may be absent if execution fails before reaching them. Final HTML and
 reports are replaced on repair, while attempt logs remain. A browser launch failure
 is recorded as an infrastructure error, not a successful check.
+
+Create the passive review page for any completed run:
+
+```bash
+python3 -m tournament report results/YOUR_RUN_ID
+```
+
+Open the resulting `review.html` to compare screenshots and check results, then
+follow its explicit links to candidate HTML, patches, and logs. The review page
+does not embed or automatically execute generated candidate JavaScript. New runs
+create the report automatically on completion.
 
 Sandboxes are deleted after export; **no persistent hosted preview exists yet**.
 Open exported HTML manually in an isolated browser profile. Generated JavaScript is

@@ -2,6 +2,12 @@
 
 ## Day Planner adaptation
 
+- Live account validation returned v2 `FEATURE_NOT_ENABLED`; support the standard
+  API through the pinned SDK's `v0-sdk` extra. Fall back only on this explicit
+  response, never on authentication errors or ambiguous provisioning timeouts.
+- Read known provider settings from ignored `.env` without shell execution; exported
+  values take precedence. Credentials are never copied into the candidate sandbox.
+
 - Support one standalone `.html` file as well as the Python calculator prototype.
 - Snapshot the local HTML in a separate explicit Git repository and upload an
   exact-commit bundle, avoiding a public GitHub prerequisite.

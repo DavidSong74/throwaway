@@ -76,7 +76,7 @@ def verify(source, output, baseline=False):
                 expect(block("Fixed meeting").locator("small")).to_contain_text("10:00")
                 expect(block("Read history").locator("small")).to_contain_text("08:50")
                 page.locator("#g").fill("10")
-                page.locator("#g").dispatch_event("change")
+                page.locator("#g").press("Tab")
                 expect(block("Read history").locator("small")).to_contain_text("08:55")
             check("fixed_time_and_breaks", schedule)
 
@@ -154,11 +154,11 @@ def verify(source, output, baseline=False):
 
             def invalid():
                 page.locator("#e").fill("07:00")
-                page.locator("#e").dispatch_event("change")
+                page.locator("#e").press("Tab")
                 expect(blocks()).to_have_count(0)
                 assert page.locator("#tl").inner_text().strip(), "Invalid day needs an explanatory message"
                 page.locator("#e").fill("20:00")
-                page.locator("#e").dispatch_event("change")
+                page.locator("#e").press("Tab")
             check("invalid_day", invalid)
 
             page.screenshot(path=str(output / "desktop.png"), full_page=True)

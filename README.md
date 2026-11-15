@@ -1,5 +1,16 @@
 # Parallel AI Development — Tournament Starter & Hackathon MVP Guide
 
+## Demo app — ready
+
+Open **http://127.0.0.1:8787/?run=20261115T074027Z-8525f744** for the current two-candidate comparison.
+Both generated Day Planner candidates passed all 13 browser checks. Both hosted previews returned HTTP 200 and both exported patches reconstructed their verified source on clean checkouts.
+
+Start/restart locally with `.venv/bin/python -m tournament.server`. The React build is served by that coordinator; rebuild with `cd ui && npm run build` after frontend changes. Provider keys are read from ignored `.env` on the server.
+
+Use **Open live preview**, **Diff**, **Checks**, then **Select & download patch**. Selection verifies clean patch application and freezes the chosen source hash. **Clean up sandboxes** deletes hosted resources while keeping artifacts. A 15-minute expiry also limits the review window. Do not restart the server during an active generation run.
+
+---
+
 ## Day Planner runner — available now
 
 The Python runner supports your standalone `examples/day_planner/Day Planner.html`.
@@ -49,7 +60,7 @@ The demo uses two **fixed local fixtures, not AI models**. One implementation pa
    python3 -m pip install -e '.[cloud]'
    ```
 
-4. Export the variables named in `.env.example`. No keys are included, and `.env` is not loaded automatically. Never put keys in repository URLs or task files. Then inspect the catalog and choose an available model:
+4. Copy `.env.example` to `.env` and fill in your local values, or export them in your shell. The runner reads `.env` without executing shell commands; existing environment values take precedence. Never put keys in repository URLs or task files. Then inspect the catalog and choose an available model:
 
    ```bash
    python3 -m tournament models
@@ -64,7 +75,7 @@ The demo uses two **fixed local fixtures, not AI models**. One implementation pa
 ### What works in this starter
 
 - Hosted Nosana catalog/completions adapter; strict JSON source response.
-- Daytona v2 create/execute/delete adapter, pinned to `2.0.0a12`.
+- Daytona v2/standard API adapter, pinned to `2.0.0a12` with its `v0-sdk` extra. Automatic fallback occurs only when the account explicitly reports v2 is not enabled.
 - One existing Python source file per attempt; no model-controlled shell commands.
 - Same immutable SHA, separate sandbox and model history for each attempt.
 - Operator-specified tests, bounded repair, tracked-file integrity checks.
@@ -72,11 +83,11 @@ The demo uses two **fixed local fixtures, not AI models**. One implementation pa
 - Cleanup after success and failure, with a separate cleanup status.
 - Offline integration test reconstructing a winning patch and rerunning tests.
 
-**Cloud integrations have not been exercised with real credentials.** SDK behavior, account access, and model availability still need a live smoke test. Configuration and package installation alone do not establish a working provider connection.
+**Connection smoke tests verified:** the Nosana model catalog authenticated successfully, and Daytona's standard API created a sandbox, executed Python, and confirmed deletion. This account reports that v2 is not enabled. Full candidate-run results are recorded separately under `results/`; a smoke test alone does not establish working generation and browser acceptance.
 
 ### Starter boundaries and next milestones
 
-This starter is the narrow first-run prototype from the playbook, not the full multi-file app-development agent. There are no web previews, browser checks, comparison UI, follow-up revisions, private repo credentials, or automatic PRs yet.
+This starter supports the Python calculator and standalone Day Planner HTML with browser checks, exported pages, and screenshots. There are no persistent hosted previews, comparison UI, follow-up revisions, private repo credentials, or automatic PRs yet.
 
 1. Verify one actual model response and one Daytona lifecycle with your account.
 2. Run a two-candidate calculator task; inspect logs and apply the preferred patch to a clean clone at the recorded SHA. No branch is pushed by this runner.
